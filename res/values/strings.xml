@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">修正屏幕亮度</string>
+    <string name="app_uninstall">修正完毕后，请卸载此应用，以免影响您的正常使用。</string>
+</resources>
