@@ -11,6 +11,10 @@
 # generated files
 autoBrightness/bin/
 autoBrightness/gen/
+testSurfaceView/bin/
+testSurfaceView/gen/
+
 
 # Local configuration file (sdk path, etc)
 autoBrightness/local.properties
+testSurfaceView/local.properties
