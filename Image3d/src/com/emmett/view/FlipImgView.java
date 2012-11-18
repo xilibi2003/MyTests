@@ -7,8 +7,10 @@ import android.graphics.BitmapFactory;
 import android.graphics.Camera;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 
 
 public class FlipImgView extends View {
@@ -19,6 +21,14 @@ public class FlipImgView extends View {
     private Camera camera ;
     private int deltaX , deltaY ; //翻转角度差值
     private int centerX , centerY ; //图片中心点
+
+    private int mTouchSlop;
+    int mStartX ;
+    int mStartY ;
+    int mSrollX;
+    int mSrollY;
+    int mLastX;
+    int mLastY;
 
     public FlipImgView(Context context) {
         super(context);
@@ -32,37 +42,52 @@ public class FlipImgView extends View {
         centerY = showBmp.getHeight()/2 ;
         matrix = new Matrix();
         camera = new Camera();
+
+        final ViewConfiguration config = ViewConfiguration.get(super.getContext());
+        mTouchSlop = config.getScaledTouchSlop();
+        Log.d("xlb", "mTouchSlop: " + mTouchSlop);
     }
 
-    int lastMouseX ;
-    int lastMouseY ;
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         int x = (int) event.getX();
         int y = (int) event.getY();
         switch(event.getAction()) {
          case MotionEvent.ACTION_DOWN:
-             lastMouseX = x ;
-             lastMouseY = y ;
+             mStartX = x ;
+             mLastX = mStartX;
+             mStartY = y ;
+             mLastY = mStartY;
              break;
          case MotionEvent.ACTION_MOVE:
-             int dx = x - lastMouseX ;
-             int dy = y - lastMouseY ;
-             deltaX += dx ;
-             deltaY += dy ;
+             int dx = x - mLastX ;
+             if(dx > mTouchSlop || dx < -mTouchSlop) {
+                 mSrollX = x - mStartX;
+                 deltaX = mSrollX;
+                 mLastX = x;
+                 invalidate();
+             }
+
+             int dy = y - mLastY ;
+             if(dy > mTouchSlop || dy < -mTouchSlop) {
+                 mSrollY = y - mStartY;
+                 deltaY += mSrollY ;
+                 mLastY = y;
+                 invalidate();
+             }
              break;
          }
 
-        invalidate();
         return true;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
+        Log.d("xlb", "deltaX: " + deltaX);
 
         camera.save();
         //绕X轴翻转
-        camera.rotateX(-deltaY);
+//        camera.rotateX(-deltaY);
         //绕Y轴翻转
         camera.rotateY(deltaX);
         //设置camera作用矩阵
