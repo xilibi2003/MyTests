@@ -170,37 +170,21 @@ public class FlipImgView extends View {
         timePassed = AnimationUtils.currentAnimationTimeMillis() - mStartTime;
 
         if (timePassed >= mDuration) {
-            if(mIsFling) {
                 mIsFling = false;
 //                rollback();
-            } else {
-                mIsRollBack = false;
-            }
-
-//            if(!mIsFling && !mIsRollBack) {
-//                int left = deltaX % HALF_CIRCLE_DEGREE ;
-//                if(left < QUARTER_CIRCLE_DEGREE) {
-//                    deltaX = (deltaX / HALF_CIRCLE_DEGREE) * HALF_CIRCLE_DEGREE;
-//                } else {
-//                    deltaX = (deltaX / HALF_CIRCLE_DEGREE + 1) * HALF_CIRCLE_DEGREE;
-//                }
-//                invalidate();
-//            }
-
             return;
         } 
 
         float timeSec = timePassed / 1000f;
         int passedDegree = 0;
-        if(mVelocityX > 0) {
+        if(mVelocityX >= 0) {
             passedDegree = (int)((mVelocityX * timeSec) - ((mDeceleration * timeSec * timeSec) / 2));   // s = vt - (0.5* gt^2)   以重力加速度逐减产生的位移 当为角度
         } else {
             passedDegree = (int)((mVelocityX * timeSec) + ((mDeceleration * timeSec * timeSec) / 2));   // s = vt - (0.5* gt^2)   以重力加速度逐减产生的位移 当为角度
         }
         Log.d("xlb", "timeSec " + timeSec +  ",  passedDegree: " + passedDegree);
         int diffDegree = passedDegree - passDegree;
-        
-        
+
         if(diffDegree > MAX_DEGREE_ONCE) {
             diffDegree = MAX_DEGREE_ONCE;
         } else if(diffDegree < NEGATIVE_MAX_DEGREE_ONCE) {
@@ -214,6 +198,48 @@ public class FlipImgView extends View {
         passDegree = passedDegree;
 
         invalidate();
+    }
+
+    private void updateRollbackAnimation() {
+        timePassed = AnimationUtils.currentAnimationTimeMillis() - mStartTime;
+
+        if (timePassed >= mDuration) {
+            mIsRollBack = false;
+
+            int left = deltaX % HALF_CIRCLE_DEGREE ;
+            if(left < QUARTER_CIRCLE_DEGREE) {
+                deltaX = (deltaX / HALF_CIRCLE_DEGREE) * HALF_CIRCLE_DEGREE;
+            } else {
+                deltaX = (deltaX / HALF_CIRCLE_DEGREE + 1) * HALF_CIRCLE_DEGREE;
+            }
+            invalidate();
+            return ;
+        }
+
+        float timeSec = timePassed / 1000f;
+        int passedDegree =  (int) (0 - ((mDeceleration * timeSec * timeSec) / 2));
+        if(deltaX < 0) {
+            passedDegree = -passedDegree;
+        }
+
+
+        Log.d("xlb", "timeSec " + timeSec +  ",  passedDegree: " + passedDegree);
+        int diffDegree = passedDegree - passDegree;
+
+        if(diffDegree > MAX_DEGREE_ONCE) {
+            diffDegree = MAX_DEGREE_ONCE;
+        } else if(diffDegree < NEGATIVE_MAX_DEGREE_ONCE) {
+            diffDegree = NEGATIVE_MAX_DEGREE_ONCE;
+        }
+
+        // update deltaX   应该是以某种程度的衰减。
+        deltaX =  deltaX + (diffDegree);
+        Log.d("xlb", "updateRollbackAnimation  deltaX " + deltaX + ", diffDegree: " + diffDegree);
+
+        passDegree = passedDegree;
+
+        invalidate();
+
     }
 
     @Override
@@ -234,8 +260,10 @@ public class FlipImgView extends View {
 
         canvas.drawBitmap(showBmp, matrix, null);
 
-        if(mIsFling || mIsRollBack) {
+        if(mIsFling ) {
             updateAnimation();
+        } else  if( mIsRollBack) {
+            updateRollbackAnimation();
         }
     }
 
