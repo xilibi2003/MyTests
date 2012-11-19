@@ -18,6 +18,14 @@ import android.view.animation.AnimationUtils;
 
 public class FlipImgView extends View {
 
+    private static final int MAX_DEGREE_ONCE = 30;
+    private static final int NEGATIVE_MAX_DEGREE_ONCE = -30;
+    private static final int MIN_DEGREE_ONCE = 5;
+
+    private static final int FULL_CIRCLE_DEGREE      = 360;
+    private static final int HALF_CIRCLE_DEGREE      = 180;
+    private static final int QUARTER_CIRCLE_DEGREE   = 90;
+
     private Context context ;
     private Bitmap showBmp ;
     private Matrix matrix ; //作用矩阵
@@ -43,16 +51,20 @@ public class FlipImgView extends View {
     int mDuration;
     private long mStartTime;
     private boolean mIsFling = false;
+    private boolean mIsRollBack = false;
+    private int totalDegree;
+    private long timePassed;
+    private int passDegree = 0;
 
     public FlipImgView(Context context) {
         super(context);
         this.context = context ;
-        initData();
         float ppi = context.getResources().getDisplayMetrics().density * 160.0f;
         mDeceleration = SensorManager.GRAVITY_EARTH   // g (m/s^2)
                 * 39.37f                        // inch/meter
                 * ppi                           // pixels per inch
-                * ViewConfiguration.getScrollFriction() * 2.5f;   // ＊2.5 by my self 加快减速速度.
+                * ViewConfiguration.getScrollFriction() * 3f;
+        initData();
     }
 
     private void initData(){
@@ -64,10 +76,10 @@ public class FlipImgView extends View {
 
         final ViewConfiguration config = ViewConfiguration.get(super.getContext());
         mTouchSlop = config.getScaledTouchSlop();
-        Log.d("xlb", "mTouchSlop: " + mTouchSlop);
 
         mMinimumVelocity = config.getScaledMinimumFlingVelocity();
         mMaximumVelocity = config.getScaledMaximumFlingVelocity();
+        Log.d("xlb", "mTouchSlop: " + mTouchSlop + ", mMaximumVelocity:" + mMaximumVelocity + ", mMinimumVelocity:" + mMinimumVelocity + ", mDeceleration:" + mDeceleration);
 
     }
 
@@ -108,11 +120,13 @@ public class FlipImgView extends View {
              break;
 
          case MotionEvent.ACTION_UP:
-             mVelocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
+             mVelocityTracker.computeCurrentVelocity(500, mMaximumVelocity);
              int xVelocity = (int) mVelocityTracker.getXVelocity();
              if(Math.abs(xVelocity) > mMinimumVelocity ) {
                  // compute the degree by velocity.
                  fling(xVelocity);
+             } else {
+                 rollback();
              }
          }
 
@@ -123,25 +137,82 @@ public class FlipImgView extends View {
         mIsFling = true;
         deltaBaseX = deltaX;
         mVelocityX = velocityX;
-        mDuration = (int) (1000 * velocityX / mDeceleration); // Duration is in milliseconds
-        Log.d("xlb", "mDuration: " + mDuration);
+        passDegree = 0;
+        mDuration = (int) (1000 * velocityX / mDeceleration); // Duration is in milliseconds   减速到0所要的时间  v=gt ;  t = v/g
+        mDuration = Math.abs(mDuration);
+        Log.d("xlb", "mDuration: " + mDuration + " , mVelocityX: " + mVelocityX);
         mStartTime = AnimationUtils.currentAnimationTimeMillis();
-//        totalDistance = (int) ((mVelocityX * mVelocityX) / (2 * mDeceleration));
+//        totalDegree = (int) ((mVelocityX * mVelocityX) / (2 * mDeceleration));     
 //        if(mVelocityX < 0) {
-//            totalDistance = -totalDistance;
+//            totalDegree = -totalDegree;
 //        }
+//        Log.d("xlb", "totalDegree: " + totalDegree + " , deltaBaseX " + deltaBaseX);
         invalidate();
     }
 
+    public void rollback() {
+        mIsRollBack = true;
+        int leftHalf = deltaX % HALF_CIRCLE_DEGREE;
+        int left = (deltaX % QUARTER_CIRCLE_DEGREE);
+//        if(leftHalf >= QUARTER_CIRCLE_DEGREE) {
+//            left = left - HALF_CIRCLE_DEGREE;
+//        }
+
+        passDegree = 0;
+        mDuration = (int) (1000 * Math.sqrt((2*Math.abs(left)) / mDeceleration)); //    相当于从left掉落要花的时间  x=0.5 * g * t^2 求t
+        mVelocityX = 0;
+        Log.d("xlb", "rollback mDuration: " + mDuration + " , left: " + left);
+        mStartTime = AnimationUtils.currentAnimationTimeMillis();
+      invalidate();
+    }
+
     private void updateAnimation() {
-        Log.d("xlb", "updateAnimation: ");
-        final long timePassed = AnimationUtils.currentAnimationTimeMillis() - mStartTime;
+        timePassed = AnimationUtils.currentAnimationTimeMillis() - mStartTime;
+
         if (timePassed >= mDuration) {
-            mIsFling = false;
+            if(mIsFling) {
+                mIsFling = false;
+//                rollback();
+            } else {
+                mIsRollBack = false;
+            }
+
+//            if(!mIsFling && !mIsRollBack) {
+//                int left = deltaX % HALF_CIRCLE_DEGREE ;
+//                if(left < QUARTER_CIRCLE_DEGREE) {
+//                    deltaX = (deltaX / HALF_CIRCLE_DEGREE) * HALF_CIRCLE_DEGREE;
+//                } else {
+//                    deltaX = (deltaX / HALF_CIRCLE_DEGREE + 1) * HALF_CIRCLE_DEGREE;
+//                }
+//                invalidate();
+//            }
+
             return;
+        } 
+
+        float timeSec = timePassed / 1000f;
+        int passedDegree = 0;
+        if(mVelocityX > 0) {
+            passedDegree = (int)((mVelocityX * timeSec) - ((mDeceleration * timeSec * timeSec) / 2));   // s = vt - (0.5* gt^2)   以重力加速度逐减产生的位移 当为角度
+        } else {
+            passedDegree = (int)((mVelocityX * timeSec) + ((mDeceleration * timeSec * timeSec) / 2));   // s = vt - (0.5* gt^2)   以重力加速度逐减产生的位移 当为角度
         }
+        Log.d("xlb", "timeSec " + timeSec +  ",  passedDegree: " + passedDegree);
+        int diffDegree = passedDegree - passDegree;
+        
+        
+        if(diffDegree > MAX_DEGREE_ONCE) {
+            diffDegree = MAX_DEGREE_ONCE;
+        } else if(diffDegree < NEGATIVE_MAX_DEGREE_ONCE) {
+            diffDegree = NEGATIVE_MAX_DEGREE_ONCE;
+        }
+
         // update deltaX   应该是以某种程度的衰减。
-        deltaX =  deltaX + (int)(deltaBaseX * 0.05);
+        deltaX =  deltaX + (diffDegree);
+        Log.d("xlb", "updateAnimation  deltaX " + deltaX + ", diffDegree: " + diffDegree);
+
+        passDegree = passedDegree;
+
         invalidate();
     }
 
@@ -163,7 +234,7 @@ public class FlipImgView extends View {
 
         canvas.drawBitmap(showBmp, matrix, null);
 
-        if(mIsFling) {
+        if(mIsFling || mIsRollBack) {
             updateAnimation();
         }
     }
