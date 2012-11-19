@@ -20,7 +20,6 @@ public class FlipImgView extends View {
 
     private static final int MAX_DEGREE_ONCE = 30;
     private static final int NEGATIVE_MAX_DEGREE_ONCE = -30;
-    private static final int MIN_DEGREE_ONCE = 5;
 
     private static final int FULL_CIRCLE_DEGREE      = 360;
     private static final int HALF_CIRCLE_DEGREE      = 180;
@@ -32,7 +31,6 @@ public class FlipImgView extends View {
     private Camera camera ;
     private int deltaX , deltaY ; //翻转角度差值
     private int centerX , centerY ; //图片中心点
-    private int deltaBaseX;
 
     private VelocityTracker mVelocityTracker;
     private int mMinimumVelocity;
@@ -52,9 +50,10 @@ public class FlipImgView extends View {
     private long mStartTime;
     private boolean mIsFling = false;
     private boolean mIsRollBack = false;
-    private int totalDegree;
     private long timePassed;
     private int passDegree = 0;
+    private boolean mRollBackDirection;     // true   继续向前      false   向后回走
+    private boolean mIsFront;
 
     public FlipImgView(Context context) {
         super(context);
@@ -104,6 +103,10 @@ public class FlipImgView extends View {
          case MotionEvent.ACTION_MOVE:
              int dx = x - mLastX ;
              if(dx > mTouchSlop || dx < -mTouchSlop) {
+                 Log.d("xlb", "mIsFront " + mIsFront + ", mSrollX : " + mSrollX );
+                 if(!mIsFront) {
+                         x += HALF_CIRCLE_DEGREE; 
+                 }
                  mSrollX = x - mStartX;
                  deltaX = mSrollX;
                  mLastX = x;
@@ -135,35 +138,13 @@ public class FlipImgView extends View {
 
     public void fling(int velocityX) {
         mIsFling = true;
-        deltaBaseX = deltaX;
         mVelocityX = velocityX;
         passDegree = 0;
         mDuration = (int) (1000 * velocityX / mDeceleration); // Duration is in milliseconds   减速到0所要的时间  v=gt ;  t = v/g
         mDuration = Math.abs(mDuration);
         Log.d("xlb", "mDuration: " + mDuration + " , mVelocityX: " + mVelocityX);
         mStartTime = AnimationUtils.currentAnimationTimeMillis();
-//        totalDegree = (int) ((mVelocityX * mVelocityX) / (2 * mDeceleration));     
-//        if(mVelocityX < 0) {
-//            totalDegree = -totalDegree;
-//        }
-//        Log.d("xlb", "totalDegree: " + totalDegree + " , deltaBaseX " + deltaBaseX);
         invalidate();
-    }
-
-    public void rollback() {
-        mIsRollBack = true;
-        int leftHalf = deltaX % HALF_CIRCLE_DEGREE;
-        int left = (deltaX % QUARTER_CIRCLE_DEGREE);
-//        if(leftHalf >= QUARTER_CIRCLE_DEGREE) {
-//            left = left - HALF_CIRCLE_DEGREE;
-//        }
-
-        passDegree = 0;
-        mDuration = (int) (1000 * Math.sqrt((2*Math.abs(left)) / mDeceleration)); //    相当于从left掉落要花的时间  x=0.5 * g * t^2 求t
-        mVelocityX = 0;
-        Log.d("xlb", "rollback mDuration: " + mDuration + " , left: " + left);
-        mStartTime = AnimationUtils.currentAnimationTimeMillis();
-      invalidate();
     }
 
     private void updateAnimation() {
@@ -171,7 +152,7 @@ public class FlipImgView extends View {
 
         if (timePassed >= mDuration) {
                 mIsFling = false;
-//                rollback();
+                rollback();
             return;
         } 
 
@@ -200,6 +181,25 @@ public class FlipImgView extends View {
         invalidate();
     }
 
+
+    public void rollback() {
+        mIsRollBack = true;
+        int left = (deltaX % QUARTER_CIRCLE_DEGREE);
+        if(deltaX % HALF_CIRCLE_DEGREE >= QUARTER_CIRCLE_DEGREE) {
+            left = QUARTER_CIRCLE_DEGREE - left;
+            mRollBackDirection = true;
+        } else {
+            mRollBackDirection = false;
+        }
+
+        passDegree = 0;
+        mDuration = (int) (1000 * Math.sqrt((2*Math.abs(left)) / mDeceleration)); //    相当于从left掉落要花的时间  x=0.5 * g * t^2 求t
+        mVelocityX = 0;
+        Log.d("xlb", "rollback mDuration: " + mDuration + " , left: " + left);
+        mStartTime = AnimationUtils.currentAnimationTimeMillis();
+        invalidate();
+    }
+
     private void updateRollbackAnimation() {
         timePassed = AnimationUtils.currentAnimationTimeMillis() - mStartTime;
 
@@ -213,6 +213,13 @@ public class FlipImgView extends View {
                 deltaX = (deltaX / HALF_CIRCLE_DEGREE + 1) * HALF_CIRCLE_DEGREE;
             }
             invalidate();
+            int  cylinderNumber =  deltaX / HALF_CIRCLE_DEGREE ;
+            if(cylinderNumber % 2 == 0) {        // 180 的偶数为 正面
+                mIsFront = true;
+            } else {
+                mIsFront = false;
+            }
+            Log.d("xlb", "mIsFront : " + mIsFront);
             return ;
         }
 
@@ -225,6 +232,10 @@ public class FlipImgView extends View {
 
         Log.d("xlb", "timeSec " + timeSec +  ",  passedDegree: " + passedDegree);
         int diffDegree = passedDegree - passDegree;
+
+        if(mRollBackDirection) {
+            diffDegree = -diffDegree;
+        }
 
         if(diffDegree > MAX_DEGREE_ONCE) {
             diffDegree = MAX_DEGREE_ONCE;
