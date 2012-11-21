@@ -14,9 +14,10 @@ import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.animation.AnimationUtils;
+import android.widget.ImageView;
 
 
-public class FlipImgView extends View {
+public class FlipImgView extends ImageView {
 
     private static final int MAX_DEGREE_ONCE = 30;
     private static final int NEGATIVE_MAX_DEGREE_ONCE = -30;
@@ -269,13 +270,18 @@ public class FlipImgView extends View {
         matrix.preTranslate(-this.centerX, -this.centerY);
         matrix.postTranslate(this.centerX, this.centerY);
 
-        canvas.drawBitmap(showBmp, matrix, null);
+//        canvas.drawBitmap(showBmp, matrix, null);
 
         if(mIsFling ) {
             updateAnimation();
         } else  if( mIsRollBack) {
             updateRollbackAnimation();
         }
+        
+        
+        canvas.setMatrix(matrix);
+        super.onDraw(canvas);
+        
     }
 
 }
